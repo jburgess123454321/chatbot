@@ -27,6 +27,7 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// CORS (allows your website to talk to this server)
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'OPTIONS'],
@@ -47,6 +48,8 @@ app.post('/api/chat', async (req, res) => {
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'A message is required.' });
     }
+
+    console.log("USER:", message); // 👈 LOG USER MESSAGE
 
     const response = await client.responses.create({
       model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
@@ -93,7 +96,10 @@ Rules:
       response.output_text?.trim() ||
       'Sorry, I could not generate a reply.';
 
+    console.log("BOT:", answer); // 👈 LOG BOT RESPONSE
+
     return res.json({ answer });
+
   } catch (error) {
     console.error('Chat error:', error);
 
