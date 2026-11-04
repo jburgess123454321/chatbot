@@ -84,9 +84,10 @@ app.post('/api/chat', async (req, res) => {
       ]
     });
 
-    const answer =
+    let answer =
       response.output_text?.trim() ||
       'Sorry, I could not generate a reply.';
+    answer = answer.replace(/\s*【[^】]*】/g, '').replace(/\s+([.,])/g, '$1'); // remove file search source tags
 
     console.log("BOT:", answer);
 
