@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fs from 'fs';
+import { notify } from './notify.js';
 
 dotenv.config();
 
@@ -90,9 +91,9 @@ app.post('/api/chat', async (req, res) => {
     answer = answer.replace(/\s*【[^】]*】/g, '').replace(/\s+([.,])/g, '$1'); // remove file search source tags
 
     console.log("BOT:", answer);
+    notify(message, answer, req.get('referer'));
 
     return res.json({ answer });
-
   } catch (error) {
     console.error('Chat error:', error);
 
