@@ -55,6 +55,13 @@ app.post('/api/chat', async (req, res) => {
 
     console.log("USER:", message);
 
+    // Private dining, celebration and Christmas party questions always get the enquiry form
+    const wantsEnquiry = /private din|river house|christmas part|christmas do|work do|private (party|event|room|function|hire)|celebrat|birthday party|anniversary|gathering|exclusive use|function room/i.test(message) &&
+      !/away day|meeting|delegate|conference|corporate|training|\broom\b|\bstay\b|\bnights?\b|lodge|table for/i.test(message);
+    const systemText = wantsEnquiry
+      ? instructions + '\n\nFOR THIS MESSAGE: the private dining enquiry form will be shown automatically under your reply. Mention it once ("pop your details in the form below"). Do not ask whether to show it and do not add any tag.'
+      : instructions;
+
     const response = await client.responses.create({
       model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
       tools: [
@@ -69,7 +76,7 @@ app.post('/api/chat', async (req, res) => {
           content: [
             {
               type: 'input_text',
-              text: instructions
+              text: systemText
             }
           ]
         },
@@ -89,16 +96,24 @@ app.post('/api/chat', async (req, res) => {
       response.output_text?.trim() ||
       'Sorry, I could not generate a reply.';
     answer = answer.replace(/\s*【[^】]*】/g, '').replace(/\s+([.,])/g, '$1'); // remove file search source tags
+    answer = answer.replace(/\s*—\s*/g, ', '); // house style: no em dashes
 
     // [[BOOKING]] / [[BOOKING:package]] asks the chat window for its room date picker,
-    // and [[TABLE]] / [[TABLE:tea]] for its table picker
+    // [[TABLE]] / [[TABLE:tea]] for its table picker, and [[ENQUIRY]] for the private dining form
     let booking = null;
     let table = null;
+    let enquiry = null;
     const bookingTag = answer.match(/\[\[\s*BOOKING(?:\s*:\s*([a-z0-9]+))?\s*\]\]/i);
     const tableTag = answer.match(/\[\[\s*TABLE(?:\s*:\s*([a-z0-9]+))?\s*\]\]/i);
+    const enquiryTag = answer.match(/\[\[\s*ENQUIRY\s*\]\]/i);
     if (bookingTag) booking = { package: (bookingTag[1] || 'room').toLowerCase() };
     else if (tableTag) table = { kind: (tableTag[1] || 'table').toLowerCase() };
-    if (bookingTag || tableTag) {
+    else if (enquiryTag || wantsEnquiry) enquiry = { type: 'private-dining' };
+    if (enquiry) {
+      // The form is already showing, so drop any line offering to show it
+      answer = answer.replace(/[^.?!\n]*(would you like|shall i|do you want|let me know if you'?d like)[^.?!\n]*\b(form|add|show)\b[^.?!\n]*[?.]\s*/gi, '').trim();
+    }
+    if (bookingTag || tableTag || enquiryTag) {
       answer = answer.replace(/\s*\[\[[^\]]*\]\]/g, '').trim();
       // If the date picker is already mentioned, drop a repeated closing line about it
       const paragraphs = answer.split(/\n\s*\n/);
@@ -108,10 +123,10 @@ app.post('/api/chat', async (req, res) => {
       }
     }
 
-    console.log("BOT:", answer, booking ? '(date picker: ' + booking.package + ')' : '', table ? '(table picker: ' + table.kind + ')' : '');
+    console.log("BOT:", answer, booking ? '(date picker: ' + booking.package + ')' : '', table ? '(table picker: ' + table.kind + ')' : '', enquiry ? '(enquiry form)' : '');
     notify(message, answer, req.get('referer'));
 
-    return res.json({ answer, booking, table });
+    return res.json({ answer, booking, table, enquiry });
   } catch (error) {
     console.error('Chat error:', error);
 
