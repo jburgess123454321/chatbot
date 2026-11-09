@@ -90,10 +90,24 @@ app.post('/api/chat', async (req, res) => {
       'Sorry, I could not generate a reply.';
     answer = answer.replace(/\s*【[^】]*】/g, '').replace(/\s+([.,])/g, '$1'); // remove file search source tags
 
-    console.log("BOT:", answer);
+    // [[BOOKING]] or [[BOOKING:package]] asks the chat window to show its date picker
+    let booking = null;
+    const bookingTag = answer.match(/\[\[\s*BOOKING(?:\s*:\s*([a-z0-9]+))?\s*\]\]/i);
+    if (bookingTag) {
+      booking = { package: (bookingTag[1] || 'room').toLowerCase() };
+      answer = answer.replace(/\s*\[\[[^\]]*\]\]/g, '').trim();
+      // If the date picker is already mentioned, drop a repeated closing line about it
+      const paragraphs = answer.split(/\n\s*\n/);
+      if (paragraphs.length > 1 && /date picker/i.test(paragraphs[paragraphs.length - 1]) &&
+          /date picker/i.test(paragraphs.slice(0, -1).join(' '))) {
+        answer = paragraphs.slice(0, -1).join('\n\n');
+      }
+    }
+
+    console.log("BOT:", answer, booking ? '(date picker: ' + booking.package + ')' : '');
     notify(message, answer, req.get('referer'));
 
-    return res.json({ answer });
+    return res.json({ answer, booking });
   } catch (error) {
     console.error('Chat error:', error);
 
